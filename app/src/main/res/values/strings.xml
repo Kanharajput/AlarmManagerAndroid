@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Make You Healty</string>
+    <string name="notification_title">Walk for 15 minutes</string>
+    <string name="notification_second_line">Start walking to get better health</string>
 </resources>

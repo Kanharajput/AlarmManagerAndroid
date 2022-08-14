@@ -1,16 +1,13 @@
 package com.example.makeyouhealty;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.NotificationCompat;
 
-import android.app.NotificationChannel;
+import android.app.AlarmManager;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.content.Context;
 import android.content.Intent;
-import android.graphics.Color;
-import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.widget.CompoundButton;
 import android.widget.Toast;
 import android.widget.ToggleButton;
@@ -22,7 +19,6 @@ public class MainActivity extends AppCompatActivity {
 
     // unique notification id and notification channel string
     private final int NOTIFICATION_ID = 0;
-    private final String PRIMARY_CHANNEL_ID = "primary_notification_channel";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,12 +27,18 @@ public class MainActivity extends AppCompatActivity {
 
         // intialising the alarmToggle data member
         alarmToggle = findViewById(R.id.alarmToggle);
-
-        // get the notification manager
+        // intialise the notification manager
         notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
-        // create the notification channel
-        createNotificationChannel();
+        // intent to send a broadcast
+        Intent notifyIntent = new Intent(this,AlarmReceiver.class);
+        PendingIntent notifyPendingIntent = PendingIntent.getBroadcast(this,
+                                                                                NOTIFICATION_ID,
+                                                                                notifyIntent,
+                                                                                PendingIntent.FLAG_IMMUTABLE);
+
+        // Initialise the alarm manager
+        AlarmManager alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
 
         alarmToggle.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             // so here the first parameter is the toggle button that is alarmToggle and
@@ -46,52 +48,36 @@ public class MainActivity extends AppCompatActivity {
                 String toastMessage = "some faults";
                 if(isChecked) {
                     toastMessage = "Stand-up alarm is on";
-                    deliverNotification(MainActivity.this);
+
+                    // repeat time for the alarm in milliseconds for 10 seconds
+                    // understand it like an alarm without snooze mode for example we set an alarm for 6 am
+                    // and then we also set that each morning 6 am. and how this each morning is calculated
+                    // 24 hours letter after 6am. so here it is that
+                    long repeatTimeInterval = 10*1000;
+                    // elapsedRealTime returnt the total time since booted and
+                    // also counting when cpu is in saving mode or screen is off
+                    // trigger alarm when elapsed time will increases by 1 minute
+                    long triggerTime = (long) (SystemClock.elapsedRealtime() + repeatTimeInterval);
+
+                    // this method repeat till we not off the toggle button
+                    // ELAPSED_REALTIME_WAKEUP will also wake up the device if it will be sleeping
+                    // here repeating time is 10 seconds but it is not pop ups accuratly at that time
+                    // might be after 15, 20 , 30 or any no of seconds but not less than 10
+                    alarmManager.setInexactRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                                                    triggerTime,
+                                                    repeatTimeInterval,
+                                                    notifyPendingIntent);
                 } else {
                     toastMessage = "stand-up alarm is off";
                     notificationManager.cancelAll();                  // cancel all the notification belongs to the activity
+
+                    if(alarmManager != null) {
+                        alarmManager.cancel(notifyPendingIntent);         // cancel the alarm
+                    }
                 }
                 // MainActivity.this is to pass the context of activity otherwise it is passing onCheckedChangeListener
                 Toast.makeText(MainActivity.this,toastMessage,Toast.LENGTH_SHORT).show();
             }
         });
     }
-
-    private void createNotificationChannel() {
-        // notification channel only work above android version 8.1
-        if(Build.VERSION.SDK_INT > Build.VERSION_CODES.O) {
-            NotificationChannel notificationChannel = new NotificationChannel(PRIMARY_CHANNEL_ID,
-                                                                        "stand_up_notification",
-                                                                               NotificationManager.IMPORTANCE_HIGH);
-            notificationChannel.enableLights(true);
-            // this option is not present in my phone
-            notificationChannel.setLightColor(Color.BLUE);
-            notificationChannel.enableVibration(true);
-            notificationChannel.setDescription("notify every 15 minutes to stand and walk");
-            notificationManager.createNotificationChannel(notificationChannel);
-        }
-    }
-
-    // to understand about this more check github we already did it
-    private void deliverNotification(Context context) {
-        // when user clicks on notification it opens up the Activity
-        Intent contentIntent = new Intent(context,MainActivity.class);
-        PendingIntent contentPendingIntent = PendingIntent.getActivity(context,
-                                                                        NOTIFICATION_ID,
-                                                                        contentIntent,
-                                                                        PendingIntent.FLAG_IMMUTABLE);
-
-        // Build the notification
-        NotificationCompat.Builder notification = new NotificationCompat.Builder(context,PRIMARY_CHANNEL_ID);
-        notification.setSmallIcon(R.drawable.walk);
-        notification.setDefaults(NotificationCompat.DEFAULT_ALL);
-        notification.setContentIntent(contentPendingIntent);
-        notification.setContentTitle(getString(R.string.notification_title));
-        notification.setContentText(getString(R.string.notification_second_line));
-        notification.setAutoCancel(true);
-
-        // deliver the notification
-        notificationManager.notify(NOTIFICATION_ID,notification.build());
-    }
-
 }

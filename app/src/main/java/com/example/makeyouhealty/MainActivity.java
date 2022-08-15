@@ -114,4 +114,7 @@ public class MainActivity extends AppCompatActivity {
             alarmInfoShowingTxt.setText(local.toString());
         }
     }
+
+    public void setTimeForNotification(View view) {
+    }
 }

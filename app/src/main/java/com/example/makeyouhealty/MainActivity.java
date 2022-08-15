@@ -10,8 +10,15 @@ import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.View;
 import android.widget.CompoundButton;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
+
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.TimeZone;
 
 public class MainActivity extends AppCompatActivity {
     // object for toggle button
@@ -21,10 +28,19 @@ public class MainActivity extends AppCompatActivity {
     // unique notification id and notification channel string
     private final int NOTIFICATION_ID = 0;
 
+    // alarm manager for the system
+    AlarmManager alarmManager;
+
+    // objects for the textview
+    TextView alarmInfoShowingTxt;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // initialising the alarmInfoShowingTxt
+        alarmInfoShowingTxt = findViewById(R.id.showNextAlarmTextview);
 
         // intialising the alarmToggle data member
         alarmToggle = findViewById(R.id.alarmToggle);
@@ -39,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
                                                                                 PendingIntent.FLAG_IMMUTABLE);
 
         // Initialise the alarm manager
-        AlarmManager alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
+        alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
 
         alarmToggle.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             // so here the first parameter is the toggle button that is alarmToggle and
@@ -83,7 +99,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void getNextAlarm(View view) {
+        AlarmManager.AlarmClockInfo nextAlarmInfo = alarmManager.getNextAlarmClock();
 
+        // nextAlarmInfo is null if there is no next alarm scheduled
+        if(nextAlarmInfo != null) {
+            long triggerTimeInMills = nextAlarmInfo.getTriggerTime();
+            //alarmInfoShowingTxt.setText(String.valueOf(triggerTimeInMills));
 
+            // below code is use to covert the utc to ist
+            // it also include day date time ist
+            Date date = new Date(triggerTimeInMills);
+            String timeZone = "IST";
+            Date local = new Date(date.getTime() + TimeZone.getTimeZone(timeZone).getOffset(date.getTime()));
+            alarmInfoShowingTxt.setText(local.toString());
+        }
     }
 }

@@ -1,15 +1,19 @@
 package com.example.makeyouhealty;
 
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.AlarmManager;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.util.Log;
 import android.view.View;
 import android.widget.CompoundButton;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
@@ -24,6 +28,8 @@ public class MainActivity extends AppCompatActivity {
     // object for toggle button
     private ToggleButton alarmToggle;
     private NotificationManager notificationManager;
+    private EditText userManualTimeForNotificationEdt;
+
 
     // unique notification id and notification channel string
     private final int NOTIFICATION_ID = 0;
@@ -34,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
     // objects for the textview
     TextView alarmInfoShowingTxt;
 
+    @RequiresApi(api = Build.VERSION_CODES.S)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -41,6 +48,9 @@ public class MainActivity extends AppCompatActivity {
 
         // initialising the alarmInfoShowingTxt
         alarmInfoShowingTxt = findViewById(R.id.showNextAlarmTextview);
+
+        // initialising the userManualTimeForNotificationEdt to get the time when we have to send the notification
+        userManualTimeForNotificationEdt = findViewById(R.id.getFixTimeToSendNotificationEdt);
 
         // intialising the alarmToggle data member
         alarmToggle = findViewById(R.id.alarmToggle);
@@ -56,6 +66,13 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialise the alarm manager
         alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
+
+        // we can't run the setExact without accessing permission to use it in manifest
+        // as it trigger at exact time and not let the system to save battery
+        // this method will return true if permission granted
+        if(alarmManager.canScheduleExactAlarms()) {
+            Log.d("SCHEDULE_ALARM","YES");
+        }
 
         alarmToggle.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             // so here the first parameter is the toggle button that is alarmToggle and
@@ -116,5 +133,52 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void setTimeForNotification(View view) {
+        // the time set by the user to get a notification
+        String timeWithHMS = userManualTimeForNotificationEdt.getText().toString();
+
+        if(timeWithHMS == null) {
+            Toast.makeText(this,"Please pass a time string",Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this,"Notification time is set",Toast.LENGTH_SHORT).show();
+            // split the string from where there is a :
+            String[] timeValues = timeWithHMS.split(":");
+            // getting the current time in ist form as well as in milliseconds
+
+            // getting hour, minute and second differently
+            Integer user_hour = Integer.parseInt(timeValues[0]);
+            Integer user_minute = Integer.parseInt(timeValues[1]);
+            Integer user_second = Integer.parseInt(timeValues[2]);
+
+            // getting the current time
+            Date currentTime = Calendar.getInstance().getTime();
+            int hours = currentTime.getHours();
+            int minutes = currentTime.getMinutes();
+            int seconds = currentTime.getSeconds();
+
+            // find out the remaining time to trigger the notification
+            // this formula only works when user time is greater than current time
+            int hour_remains = user_hour - hours;
+            int minutes_remains = user_minute - minutes;
+            int seconds_remains = user_second - seconds;
+
+            // convert this remaining time to milliseconds
+            long remaining_time_mills = ((((hour_remains * 60) + minutes_remains) * 60) + seconds_remains) * 1000;
+            // get the current time in milliseconds
+            long current_time_mills = SystemClock.elapsedRealtime();
+            // now add the remaining_time_mills to current _time_mills
+            // to find out the trigger time in mills
+            long trigger_time_mills = current_time_mills + remaining_time_mills;
+
+            // for sending the broadcast
+            Intent intent = new Intent(this, AlarmReceiver.class);
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(this,
+                                                                            NOTIFICATION_ID,
+                                                                            intent,
+                                                                            PendingIntent.FLAG_IMMUTABLE);
+
+            // this first parameter of the AlarmManager will tell the method from which clock
+            // we are referencing like here ELAPSED_REALTIME_WAKEUP so to get current time in millis we use the same clock
+            alarmManager.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, trigger_time_mills, pendingIntent);
+        }
     }
 }
